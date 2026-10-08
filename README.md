@@ -81,7 +81,7 @@
 需要先装 Xcode 命令行工具（`xcode-select --install`）。
 
 ```bash
-git clone <仓库地址>
+git clone https://github.com/Jerrywang77/LaunchpadLite.git
 cd LaunchpadLite
 
 swift test              # 跑测试
