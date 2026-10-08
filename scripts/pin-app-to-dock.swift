@@ -1,6 +1,6 @@
 import Foundation
 
-let bundleIdentifier = "com.jerryk.LaunchpadLite"
+let bundleIdentifier = "io.github.jerrywang77.LaunchpadLite"
 let appURL = URL(fileURLWithPath: "/Applications/Launchpad Lite.app")
 let defaults = UserDefaults(suiteName: "com.apple.dock")!
 
@@ -40,7 +40,7 @@ let tile: [String: Any] = [
 ]
 
 for key in ["persistent-apps", "recent-apps"] {
-    var items = defaults.array(forKey: key) as? [Any] ?? []
+    var items = defaults.array(forKey: key) ?? []
     items.removeAll(where: containsLaunchpad)
 
     if key == "persistent-apps" {
