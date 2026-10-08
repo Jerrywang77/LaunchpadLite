@@ -1,0 +1,26 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 打包
+        run: ./scripts/package-release.sh
+
+      - name: 创建 Release 并上传压缩包
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${GITHUB_REF_NAME}" dist/release/*.zip \
+            --title "${GITHUB_REF_NAME}" \
+            --generate-notes
