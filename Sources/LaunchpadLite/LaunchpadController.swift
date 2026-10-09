@@ -27,6 +27,7 @@ final class LaunchpadController: NSObject, NSMenuDelegate {
             self?.toggle()
         }
         viewModel.reload()
+        viewModel.startMonitoringAppDirectories()
     }
 
     deinit {
@@ -56,6 +57,7 @@ final class LaunchpadController: NSObject, NSMenuDelegate {
         }
 
         viewModel.updateLayout(for: screen.frame.size)
+        viewModel.refreshIfStale()
 
         if reusePresentedPanel, let panel {
             panel.setFrame(screen.frame, display: true)

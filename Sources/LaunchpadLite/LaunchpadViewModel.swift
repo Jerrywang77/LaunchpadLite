@@ -45,6 +45,7 @@ final class LaunchpadViewModel: ObservableObject {
     private var horizontalSwipeDidTrigger = false
     private var horizontalGestureResetWorkItem: DispatchWorkItem?
     private var pageFlipWorkItem: DispatchWorkItem?
+    private var directoryWatcher: AppDirectoryWatcher?
     private var lastGesturePageChangeTime: TimeInterval = 0
     private let gestureDeduplicationInterval: TimeInterval = 0.08
 
@@ -361,6 +362,7 @@ final class LaunchpadViewModel: ObservableObject {
         extraSearchRoots.append(standardized)
         storedLayout.extraSearchRoots = extraSearchRoots.map(\.path)
         layoutStore.save(storedLayout)
+        startMonitoringAppDirectories()
         lastScanDate = nil
         reload(force: true)
     }
@@ -395,16 +397,52 @@ final class LaunchpadViewModel: ObservableObject {
                     return
                 }
 
+                let previousSelectionID = self.selectedApp?.id
+
                 let orderedApps = LaunchpadLayout.reconcile(scanned: result.apps, with: self.storedLayout)
                 self.apps = orderedApps
                 self.persistLayout(for: orderedApps)
                 self.skippedAppCount = result.skipped
                 self.lastScanDate = Date()
                 self.isLoading = false
-                self.page = 0
-                self.selectedIndex = 0
+
+                // A background rescan (new app installed while the panel is up)
+                // must not yank the user back to the first page.
+                self.clampSelection()
+                if let previousSelectionID,
+                   let index = self.visibleApps.firstIndex(where: { $0.id == previousSelectionID }) {
+                    self.selectedIndex = index
+                    self.page = min(index / self.layout.pageSize, max(0, self.pageCount - 1))
+                }
             }
         }
+    }
+
+    /// Rescans whenever the app folders change, so installing or removing an app
+    /// shows up without restarting this app.
+    func startMonitoringAppDirectories() {
+        directoryWatcher?.stop()
+        directoryWatcher = AppDirectoryWatcher(roots: monitoredRoots()) { [weak self] in
+            self?.reload(force: true)
+        }
+    }
+
+    /// Safety net for changes the folder watcher cannot see (apps installed into
+    /// a nested folder, network volumes, and the like): refresh on open if the
+    /// last scan is getting old.
+    func refreshIfStale(maxAge: TimeInterval = 120) {
+        guard let lastScanDate else {
+            reload()
+            return
+        }
+        guard Date().timeIntervalSince(lastScanDate) > maxAge else {
+            return
+        }
+        reload(force: true)
+    }
+
+    private func monitoredRoots() -> [URL] {
+        AppScanner.searchRoots(additionalRoots: extraSearchRoots)
     }
 
     /// Drops the saved order so the next scan regenerates the default layout.

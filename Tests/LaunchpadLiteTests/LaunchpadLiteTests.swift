@@ -641,6 +641,30 @@ final class LaunchpadLiteTests: XCTestCase {
         XCTAssertEqual(AppScanner.searchRoots(additionalRoots: [extra, extra]).filter { $0.path == extra.path }.count, 1)
     }
 
+    func testDirectoryWatcherReportsFolderChanges() async throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer {
+            try? FileManager.default.removeItem(at: directory)
+        }
+
+        let fired = expectation(description: "watcher fired")
+        let watcher = AppDirectoryWatcher(roots: [directory], debounceInterval: 0.1) {
+            fired.fulfill()
+        }
+        defer { watcher.stop() }
+
+        // Installing an app is just a new entry appearing in one of these folders.
+        try "new app".write(
+            to: directory.appendingPathComponent("NewApp.app"),
+            atomically: true,
+            encoding: .utf8
+        )
+
+        await fulfillment(of: [fired], timeout: 5)
+    }
+
     @MainActor
     private func makeViewModel(appCount: Int, pageSize: Int) -> LaunchpadViewModel {
         let directory = FileManager.default.temporaryDirectory

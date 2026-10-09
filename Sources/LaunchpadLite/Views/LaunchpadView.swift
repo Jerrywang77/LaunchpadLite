@@ -149,7 +149,9 @@ struct LaunchpadView: View {
 
     @ViewBuilder
     private var content: some View {
-        if viewModel.isLoading {
+        // Only take over the screen on the very first load: a background rescan
+        // (new app installed while the panel is open) shouldn't blank the grid.
+        if viewModel.isLoading && viewModel.apps.isEmpty {
             LoadingState()
         } else if let errorMessage = viewModel.errorMessage {
             ErrorState(message: errorMessage) {
