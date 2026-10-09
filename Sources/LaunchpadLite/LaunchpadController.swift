@@ -14,6 +14,7 @@ final class LaunchpadController: NSObject, NSMenuDelegate {
     private var restoreHiddenItem: NSMenuItem?
     private var scrollMonitor: Any?
     private var presentationLifecycle = PresentationLifecycle()
+    private var launchThrottle = LaunchThrottle()
 
     init(viewModel: LaunchpadViewModel? = nil) {
         self.viewModel = viewModel ?? LaunchpadViewModel()
@@ -196,8 +197,25 @@ final class LaunchpadController: NSObject, NSMenuDelegate {
     }
 
     private func launch(_ app: LaunchpadAppItem) {
+        // 双击 = 两次点击事件，挡住第二下。
+        guard launchThrottle.shouldLaunch(at: ProcessInfo.processInfo.systemUptime) else {
+            return
+        }
+
         dismiss()
-        NSWorkspace.shared.open(app.url)
+
+        // 这里必须用异步版本：同步的 NSWorkspace.open 会一直阻塞到
+        // LaunchServices 处理完（新装的 App 首次启动还要注册 + 查恶意软件，
+        // 可能好几秒）。阻塞期间主线程卡住，表现就是「面板不消失 + 鼠标转圈」。
+        NSWorkspace.shared.openApplication(
+            at: app.url,
+            configuration: NSWorkspace.OpenConfiguration()
+        ) { _, error in
+            guard let error else {
+                return
+            }
+            NSLog("Launchpad Lite: 打开 %@ 失败：%@", app.name, error.localizedDescription)
+        }
     }
 
     private func screenUnderPointer() -> NSScreen? {

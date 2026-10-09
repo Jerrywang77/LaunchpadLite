@@ -695,6 +695,17 @@ final class LaunchpadLiteTests: XCTestCase {
         await fulfillment(of: [fired], timeout: 5)
     }
 
+    func testLaunchThrottleIgnoresTheSecondClickOfADoubleClick() {
+        var throttle = LaunchThrottle()
+
+        XCTAssertTrue(throttle.shouldLaunch(at: 100.0))
+        // 双击的第二下：应该被挡掉，否则一次双击会连开两个应用
+        XCTAssertFalse(throttle.shouldLaunch(at: 100.2))
+        XCTAssertFalse(throttle.shouldLaunch(at: 100.49))
+        // 隔得够久，正常放行
+        XCTAssertTrue(throttle.shouldLaunch(at: 100.5))
+    }
+
     @MainActor
     private func makeViewModel(appCount: Int, pageSize: Int) -> LaunchpadViewModel {
         let directory = FileManager.default.temporaryDirectory
