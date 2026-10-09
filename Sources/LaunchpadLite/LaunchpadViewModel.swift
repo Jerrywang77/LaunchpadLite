@@ -745,26 +745,9 @@ final class LaunchpadViewModel: ObservableObject {
         }
         if name.contains(term) { return 3 }
 
-        // bundle id 用户是看不见的，所以只有当查询本身就长得像 bundle id，
-        // 或者正好是其中一段的开头时才匹配。否则像 "ch" 这种短词会把一堆
-        // 包里带 Launcher / Charlie 的 App 全捞出来，用户看不出为什么命中。
-        let identifier = (app.bundleIdentifier ?? "").localizedLowercase
-        guard !identifier.isEmpty else {
-            return nil
-        }
-
-        if term.contains(".") {
-            return identifier.contains(term) ? 4 : nil
-        }
-
-        // 太短的查询不碰 bundle id：否则 "ch" 会命中 com.charliemonroe.* 这类
-        // 只有开发者名字里带 ch 的包，用户完全看不出为什么。
-        guard term.count >= 4 else {
-            return nil
-        }
-
-        let segments = identifier.split(whereSeparator: { $0 == "." || $0 == "-" || $0 == "_" })
-        return segments.contains(where: { $0.hasPrefix(term) }) ? 5 : nil
+        // 只按应用名匹配：bundle id 对普通用户是隐形的（文档里也叫「搜索应用」），
+        // 之前匹配它会让 "ch" 命中 com.apple.*.launcher 这类用户看不出原因的包。
+        return nil
     }
 
     private func clampSelection() {

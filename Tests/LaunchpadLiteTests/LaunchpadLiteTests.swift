@@ -14,7 +14,7 @@ final class LaunchpadLiteTests: XCTestCase {
         XCTAssertEqual(display.rows, 6)
     }
 
-    func testFilterMatchesNameAndBundleIdentifier() {
+    func testFilterMatchesAppNameOnly() {
         let apps = [
             makeApp(name: "Safari", bundleIdentifier: "com.apple.Safari"),
             makeApp(name: "Notes", bundleIdentifier: "com.apple.Notes"),
@@ -26,13 +26,17 @@ final class LaunchpadLiteTests: XCTestCase {
             ["Safari"]
         )
         XCTAssertEqual(
-            LaunchpadViewModel.filteredApps(from: apps, query: "com.apple.notes").map(\.name),
+            LaunchpadViewModel.filteredApps(from: apps, query: "notes").map(\.name),
             ["Notes"]
         )
         XCTAssertEqual(
-            LaunchpadViewModel.filteredApps(from: apps, query: "apple term").map(\.name),
+            LaunchpadViewModel.filteredApps(from: apps, query: "term").map(\.name),
             ["Terminal"]
         )
+
+        // 只搜应用名：bundle id 不参与（普通用户看不到它，之前会搜出一堆看不懂的结果）
+        XCTAssertTrue(LaunchpadViewModel.filteredApps(from: apps, query: "com.apple.notes").isEmpty)
+        XCTAssertTrue(LaunchpadViewModel.filteredApps(from: apps, query: "apple").isEmpty)
     }
 
     func testSearchShowsNameMatchesFirstAndIgnoresBundleIdentifierNoise() {
@@ -54,7 +58,7 @@ final class LaunchpadLiteTests: XCTestCase {
             ["Chess", "Google Chrome", "Time Machine", "PyCharm"]
         )
 
-        // 长一点的查询仍然可以按 bundle id 找到应用（com.google.Chrome）。
+        // 搜完整名字同样能定位（Google Chrome 里的单词前缀匹配）。
         XCTAssertEqual(
             LaunchpadViewModel.filteredApps(from: apps, query: "chrome").map(\.name),
             ["Google Chrome"]
