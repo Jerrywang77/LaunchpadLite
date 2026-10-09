@@ -16,13 +16,23 @@ struct SearchHeader: View {
                 .font(.system(size: 17, weight: .medium))
                 .foregroundStyle(.secondary)
 
-            HStack(spacing: 1) {
-                Text(query.isEmpty ? "搜索应用" : query)
-                    .font(.system(size: 16, weight: .regular))
-                    .foregroundStyle(query.isEmpty ? Color.secondary : Color.primary)
-                    .lineLimit(1)
+            HStack(spacing: 2) {
+                if query.isEmpty {
+                    // 空的时候光标停在插入点(文字前面),和真正的输入框一致。
+                    caret
 
-                caret
+                    Text("搜索应用")
+                        .font(.system(size: 16, weight: .regular))
+                        .foregroundStyle(Color.black.opacity(0.30))
+                        .lineLimit(1)
+                } else {
+                    Text(query)
+                        .font(.system(size: 16, weight: .regular))
+                        .foregroundStyle(Color.primary)
+                        .lineLimit(1)
+
+                    caret
+                }
             }
 
             Spacer(minLength: 16)
