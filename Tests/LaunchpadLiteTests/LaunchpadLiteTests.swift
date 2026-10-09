@@ -35,6 +35,32 @@ final class LaunchpadLiteTests: XCTestCase {
         )
     }
 
+    func testSearchShowsNameMatchesFirstAndIgnoresBundleIdentifierNoise() {
+        let apps = [
+            makeApp(name: "About This Mac", bundleIdentifier: "com.apple.AboutThisMacLauncher"),
+            makeApp(name: "Time Machine", bundleIdentifier: "com.apple.backup.launcher"),
+            makeApp(name: "Siri", bundleIdentifier: "com.apple.siri.launcher"),
+            makeApp(name: "Downie 4", bundleIdentifier: "com.charliemonroe.Downie-4"),
+            makeApp(name: "Google Chrome", bundleIdentifier: "com.google.Chrome"),
+            makeApp(name: "Chess", bundleIdentifier: "com.apple.Chess"),
+            makeApp(name: "PyCharm", bundleIdentifier: "com.jetbrains.pycharm")
+        ]
+
+        // 搜 "ch" 只应命中名字里真的有 ch 的应用（Time Machine 的 "Machine" 也算），
+        // 并且前缀匹配排在包含匹配前面；About This Mac、Siri、Downie 4 这些名字里
+        // 没有 ch、只靠 bundle id（Launcher / charliemonroe）命中的必须消失。
+        XCTAssertEqual(
+            LaunchpadViewModel.filteredApps(from: apps, query: "ch").map(\.name),
+            ["Chess", "Google Chrome", "Time Machine", "PyCharm"]
+        )
+
+        // 长一点的查询仍然可以按 bundle id 找到应用（com.google.Chrome）。
+        XCTAssertEqual(
+            LaunchpadViewModel.filteredApps(from: apps, query: "chrome").map(\.name),
+            ["Google Chrome"]
+        )
+    }
+
     @MainActor
     func testHorizontalSwipeChangesPage() {
         let apps = (0..<12).map {

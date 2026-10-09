@@ -699,16 +699,72 @@ final class LaunchpadViewModel: ObservableObject {
         let terms = query
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .split(whereSeparator: \.isWhitespace)
-            .map(String.init)
+            .map { $0.localizedLowercase }
 
         guard !terms.isEmpty else {
             return apps
         }
 
-        return apps.filter { app in
-            let haystack = "\(app.name) \(app.bundleIdentifier ?? "")".localizedLowercase
-            return terms.allSatisfy { haystack.localizedStandardContains($0.localizedLowercase) }
+        return apps.enumerated()
+            .compactMap { index, app -> (app: LaunchpadAppItem, score: Int, index: Int)? in
+                guard let score = matchScore(for: app, terms: terms) else {
+                    return nil
+                }
+                return (app, score, index)
+            }
+            // 分越低越相关；同分时保持原来的布局顺序
+            .sorted { lhs, rhs in
+                lhs.score == rhs.score ? lhs.index < rhs.index : lhs.score < rhs.score
+            }
+            .map(\.app)
+    }
+
+    /// 分数越小越靠前，`nil` 表示没有命中全部关键词。
+    nonisolated static func matchScore(for app: LaunchpadAppItem, terms: [String]) -> Int? {
+        var total = 0
+
+        for term in terms {
+            guard let score = termScore(term, in: app) else {
+                return nil
+            }
+            total += score
         }
+
+        return total
+    }
+
+    private nonisolated static func termScore(_ term: String, in app: LaunchpadAppItem) -> Int? {
+        let name = app.name.localizedLowercase
+
+        if name == term { return 0 }
+        if name.hasPrefix(term) { return 1 }
+        if name
+            .split(whereSeparator: { $0 == " " || $0 == "-" || $0 == "_" })
+            .contains(where: { $0.hasPrefix(term) }) {
+            return 2
+        }
+        if name.contains(term) { return 3 }
+
+        // bundle id 用户是看不见的，所以只有当查询本身就长得像 bundle id，
+        // 或者正好是其中一段的开头时才匹配。否则像 "ch" 这种短词会把一堆
+        // 包里带 Launcher / Charlie 的 App 全捞出来，用户看不出为什么命中。
+        let identifier = (app.bundleIdentifier ?? "").localizedLowercase
+        guard !identifier.isEmpty else {
+            return nil
+        }
+
+        if term.contains(".") {
+            return identifier.contains(term) ? 4 : nil
+        }
+
+        // 太短的查询不碰 bundle id：否则 "ch" 会命中 com.charliemonroe.* 这类
+        // 只有开发者名字里带 ch 的包，用户完全看不出为什么。
+        guard term.count >= 4 else {
+            return nil
+        }
+
+        let segments = identifier.split(whereSeparator: { $0 == "." || $0 == "-" || $0 == "_" })
+        return segments.contains(where: { $0.hasPrefix(term) }) ? 5 : nil
     }
 
     private func clampSelection() {
