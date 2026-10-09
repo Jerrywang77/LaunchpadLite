@@ -66,7 +66,8 @@ struct LaunchpadView: View {
         ZStack {
             SearchHeader(
                 query: viewModel.query,
-                appCount: viewModel.visibleApps.count
+                appCount: viewModel.visibleApps.count,
+                isActive: viewModel.isPanelVisible
             )
 
             HStack {
