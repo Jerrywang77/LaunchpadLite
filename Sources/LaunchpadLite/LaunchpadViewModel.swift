@@ -47,6 +47,10 @@ final class LaunchpadViewModel: ObservableObject {
     private var pageFlipWorkItem: DispatchWorkItem?
     private var directoryWatcher: AppDirectoryWatcher?
     private var incompleteScanRetries = 0
+
+    /// 拷贝大应用可能要一两分钟，这段时间里每 3 秒重扫一次，最多 3 分钟。
+    private static let incompleteScanRetryDelay: TimeInterval = 3
+    private static let maxIncompleteScanRetries = 60
     private var lastGesturePageChangeTime: TimeInterval = 0
     private let gestureDeduplicationInterval: TimeInterval = 0.08
 
@@ -433,7 +437,7 @@ final class LaunchpadViewModel: ObservableObject {
     /// Safety net for changes the folder watcher cannot see (apps installed into
     /// a nested folder, network volumes, and the like): refresh on open if the
     /// last scan is getting old.
-    func refreshIfStale(maxAge: TimeInterval = 120) {
+    func refreshIfStale(maxAge: TimeInterval = 30) {
         guard let lastScanDate else {
             reload()
             return
@@ -451,17 +455,20 @@ final class LaunchpadViewModel: ObservableObject {
     /// 安装过程中扫到「半成品」bundle（Info.plist 还没拷完）时，过几秒再扫一次。
     /// 因为拷贝完成后写入的是 bundle 内部，不会再触发 /Applications 的目录事件，
     /// 只靠目录监听会一直漏掉这个应用。
+    ///
+    /// 大应用（例如 1GB、几万个文件）用 Finder 拷贝要几十秒甚至更久，
+    /// 所以窗口要给足。
     private func scheduleRetryIfScanWasIncomplete(_ isIncomplete: Bool) {
         guard isIncomplete else {
             incompleteScanRetries = 0
             return
         }
-        guard incompleteScanRetries < 3 else {
+        guard incompleteScanRetries < Self.maxIncompleteScanRetries else {
             return
         }
 
         incompleteScanRetries += 1
-        DispatchQueue.main.asyncAfter(deadline: .now() + 3) { [weak self] in
+        DispatchQueue.main.asyncAfter(deadline: .now() + Self.incompleteScanRetryDelay) { [weak self] in
             self?.reload(force: true)
         }
     }
