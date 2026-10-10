@@ -46,6 +46,7 @@ final class LaunchpadViewModel: ObservableObject {
     private var horizontalGestureResetWorkItem: DispatchWorkItem?
     private var pageFlipWorkItem: DispatchWorkItem?
     private var directoryWatcher: AppDirectoryWatcher?
+    private var incompleteScanRetries = 0
     private var lastGesturePageChangeTime: TimeInterval = 0
     private let gestureDeduplicationInterval: TimeInterval = 0.08
 
@@ -406,6 +407,8 @@ final class LaunchpadViewModel: ObservableObject {
                 self.lastScanDate = Date()
                 self.isLoading = false
 
+                self.scheduleRetryIfScanWasIncomplete(result.hadIncompleteBundles)
+
                 // A background rescan (new app installed while the panel is up)
                 // must not yank the user back to the first page.
                 self.clampSelection()
@@ -443,6 +446,24 @@ final class LaunchpadViewModel: ObservableObject {
 
     private func monitoredRoots() -> [URL] {
         AppScanner.searchRoots(additionalRoots: extraSearchRoots)
+    }
+
+    /// 安装过程中扫到「半成品」bundle（Info.plist 还没拷完）时，过几秒再扫一次。
+    /// 因为拷贝完成后写入的是 bundle 内部，不会再触发 /Applications 的目录事件，
+    /// 只靠目录监听会一直漏掉这个应用。
+    private func scheduleRetryIfScanWasIncomplete(_ isIncomplete: Bool) {
+        guard isIncomplete else {
+            incompleteScanRetries = 0
+            return
+        }
+        guard incompleteScanRetries < 3 else {
+            return
+        }
+
+        incompleteScanRetries += 1
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3) { [weak self] in
+            self?.reload(force: true)
+        }
     }
 
     /// Drops the saved order so the next scan regenerates the default layout.

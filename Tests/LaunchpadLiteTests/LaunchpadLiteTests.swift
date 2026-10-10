@@ -706,6 +706,34 @@ final class LaunchpadLiteTests: XCTestCase {
         XCTAssertTrue(throttle.shouldLaunch(at: 100.5))
     }
 
+    func testInfoDictionaryIsReadFreshFromDisk() throws {
+        let app = FileManager.default.temporaryDirectory
+            .appendingPathComponent("ReaderTest-\(UUID().uuidString).app", isDirectory: true)
+        try FileManager.default.createDirectory(
+            at: app.appendingPathComponent("Contents"),
+            withIntermediateDirectories: true
+        )
+        defer {
+            try? FileManager.default.removeItem(at: app)
+        }
+
+        // 模拟 Finder 正在拷贝：目录有了，Info.plist 还没写完
+        XCTAssertNil(AppScanner.infoDictionary(at: app))
+
+        // 拷贝完成
+        let plist: [String: Any] = [
+            "CFBundleIdentifier": "com.example.partial",
+            "CFBundlePackageType": "APPL"
+        ]
+        let data = try PropertyListSerialization.data(fromPropertyList: plist, format: .xml, options: 0)
+        try data.write(to: app.appendingPathComponent("Contents/Info.plist"))
+
+        // 同一个进程里必须能读到（Bundle(url:) 会在这种情况下返回缓存的空 bundle）
+        let info = AppScanner.infoDictionary(at: app)
+        XCTAssertEqual(info?["CFBundleIdentifier"] as? String, "com.example.partial")
+        XCTAssertEqual(info?["CFBundlePackageType"] as? String, "APPL")
+    }
+
     @MainActor
     private func makeViewModel(appCount: Int, pageSize: Int) -> LaunchpadViewModel {
         let directory = FileManager.default.temporaryDirectory

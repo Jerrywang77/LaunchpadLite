@@ -3,6 +3,9 @@ import AppKit
 struct AppScanResult {
     let apps: [LaunchpadAppItem]
     let skipped: Int
+    /// 遇到了读不出 Info.plist 的 .app（通常是被拷贝到一半的应用）。
+    /// 这种结果不完整，值得过几秒再扫一次。
+    let hadIncompleteBundles: Bool
 }
 
 struct AppScanner: Sendable {
@@ -20,14 +23,18 @@ struct AppScanner: Sendable {
         var seen = Set<String>()
         var apps: [LaunchpadAppItem] = []
         var skipped = 0
+        var hadIncompleteBundles = false
 
         for url in appURLs {
-            guard let bundle = Bundle(url: url) else {
+            // 不用 Bundle(url:)：Foundation 会按路径缓存它。安装过程中
+            // （Finder 还在往 /Applications 拷）读到的「空 bundle」会被
+            // 一直缓存住，导致这个应用在整个进程生命周期里都扫不出来。
+            guard let info = Self.infoDictionary(at: url) else {
                 skipped += 1
+                hadIncompleteBundles = true
                 continue
             }
 
-            let info = bundle.infoDictionary ?? [:]
             let isBackgroundOnly = info["LSBackgroundOnly"] as? Bool == true
             let packageType = info["CFBundlePackageType"] as? String
 
@@ -36,8 +43,9 @@ struct AppScanner: Sendable {
                 continue
             }
 
-            let identifier = bundle.bundleIdentifier ?? url.standardizedFileURL.path
-            let deduplicationKey = bundle.bundleIdentifier ?? url.standardizedFileURL.path
+            let bundleIdentifier = info["CFBundleIdentifier"] as? String
+            let identifier = bundleIdentifier ?? url.standardizedFileURL.path
+            let deduplicationKey = bundleIdentifier ?? url.standardizedFileURL.path
 
             guard seen.insert(deduplicationKey).inserted else {
                 skipped += 1
@@ -58,7 +66,6 @@ struct AppScanner: Sendable {
                 ?? resourceValues?.creationDate
                 ?? resourceValues?.contentModificationDate
                 ?? .distantFuture
-            let bundleIdentifier = bundle.bundleIdentifier
             let isOfficialApp = Self.isOfficialApp(at: url, bundleIdentifier: bundleIdentifier)
 
             let icon = NSWorkspace.shared.icon(forFile: url.path)
@@ -80,7 +87,27 @@ struct AppScanner: Sendable {
 
         apps = Self.sortedApps(apps)
 
-        return AppScanResult(apps: apps, skipped: skipped)
+        return AppScanResult(
+            apps: apps,
+            skipped: skipped,
+            hadIncompleteBundles: hadIncompleteBundles
+        )
+    }
+
+    /// 直接读 `Contents/Info.plist`，绕开 `Bundle` 的路径缓存。
+    static func infoDictionary(at url: URL) -> [String: Any]? {
+        let plistURL = url.appendingPathComponent("Contents/Info.plist")
+        guard let data = try? Data(contentsOf: plistURL),
+              let plist = try? PropertyListSerialization.propertyList(
+                  from: data,
+                  options: [],
+                  format: nil
+              ),
+              let dictionary = plist as? [String: Any]
+        else {
+            return nil
+        }
+        return dictionary
     }
 
     static func sortedApps(_ apps: [LaunchpadAppItem]) -> [LaunchpadAppItem] {
