@@ -22,6 +22,12 @@ final class LaunchpadController: NSObject, NSMenuDelegate {
     /// 否则就会表现为「点了图标闪一下 / 像没反应」。
     private static let backgroundTapGrace: TimeInterval = 0.35
 
+    /// 覆盖层要出现在所有空间，并且能叠在全屏 App 之上。
+    private static let panelCollectionBehavior: NSWindow.CollectionBehavior = [
+        .canJoinAllSpaces,
+        .fullScreenAuxiliary
+    ]
+
     init(viewModel: LaunchpadViewModel? = nil) {
         self.viewModel = viewModel ?? LaunchpadViewModel()
         super.init()
@@ -67,6 +73,7 @@ final class LaunchpadController: NSObject, NSMenuDelegate {
         viewModel.refreshIfStale()
 
         if reusePresentedPanel, let panel {
+            panel.collectionBehavior = Self.panelCollectionBehavior
             panel.setFrame(screen.frame, display: true)
             panel.alphaValue = 1
             panel.orderFrontRegardless()
@@ -81,6 +88,7 @@ final class LaunchpadController: NSObject, NSMenuDelegate {
 
         let panel = panel ?? makePanel()
         self.panel = panel
+        panel.collectionBehavior = Self.panelCollectionBehavior
         panel.setFrame(screen.frame, display: true)
         panel.keyHandler = { [weak self] event in
             self?.handleKey(event) ?? false
@@ -188,7 +196,12 @@ final class LaunchpadController: NSObject, NSMenuDelegate {
         panel.isMovable = false
         panel.isReleasedWhenClosed = false
         panel.level = .screenSaver
-        panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary]
+        // 必须用 canJoinAllSpaces：面板要出现在所有空间（包括全屏 App 之上）。
+        // 之前这里多带了一个 .stationary，它的语义是「窗口留在被创建的那个
+        // 空间里、不跟着切换空间走」，和 canJoinAllSpaces 互斥 —— 结果面板被
+        // 钉在第一个空间，用户在别的空间点 Dock 图标时「点了没反应」，滑回
+        // 第一个空间才看到它。
+        panel.collectionBehavior = Self.panelCollectionBehavior
         // 面板的显示/隐藏完全由我们自己控制，不跟随 App 的激活状态。
         panel.hidesOnDeactivate = false
         panel.contentView = NSHostingView(
