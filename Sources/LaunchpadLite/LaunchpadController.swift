@@ -15,6 +15,12 @@ final class LaunchpadController: NSObject, NSMenuDelegate {
     private var scrollMonitor: Any?
     private var presentationLifecycle = PresentationLifecycle()
     private var launchThrottle = LaunchThrottle()
+    private var presentedAt: TimeInterval = 0
+
+    /// 面板刚显示后的这段时间内，忽略「点空白处关闭」——打开面板的那一次
+    /// 点击（例如点 Dock 图标）的鼠标抬起可能落在刚出现的面板上，
+    /// 否则就会表现为「点了图标闪一下 / 像没反应」。
+    private static let backgroundTapGrace: TimeInterval = 0.35
 
     init(viewModel: LaunchpadViewModel? = nil) {
         self.viewModel = viewModel ?? LaunchpadViewModel()
@@ -39,7 +45,7 @@ final class LaunchpadController: NSObject, NSMenuDelegate {
 
     func toggle() {
         if panel?.isVisible == true {
-            dismiss()
+            dismiss(reason: "toggle")
         } else {
             present()
         }
@@ -67,6 +73,7 @@ final class LaunchpadController: NSObject, NSMenuDelegate {
             panel.makeKey()
             NSApp.activate(ignoringOtherApps: true)
             viewModel.setPanelVisible(true)
+            presentedAt = ProcessInfo.processInfo.systemUptime
             return
         }
 
@@ -83,6 +90,7 @@ final class LaunchpadController: NSObject, NSMenuDelegate {
         }
         viewModel.resetHorizontalGesture()
         viewModel.setPanelVisible(true)
+        presentedAt = ProcessInfo.processInfo.systemUptime
 
         panel.alphaValue = 0
         panel.orderFrontRegardless()
@@ -134,7 +142,13 @@ final class LaunchpadController: NSObject, NSMenuDelegate {
         assertPanelOnScreen(panel)
     }
 
-    func dismiss() {
+    func dismiss(reason: String = "unknown") {
+        if reason == "backgroundTap",
+           ProcessInfo.processInfo.systemUptime - presentedAt < Self.backgroundTapGrace {
+            NSLog("Launchpad Lite: 忽略刚显示后的那次空白点击（打开面板的点击余波）")
+            return
+        }
+
         guard let panel else {
             return
         }
@@ -184,7 +198,7 @@ final class LaunchpadController: NSObject, NSMenuDelegate {
                     self?.launch(app)
                 },
                 onClose: { [weak self] in
-                    self?.dismiss()
+                    self?.dismiss(reason: "backgroundTap")
                 },
                 onReveal: { app in
                     NSWorkspace.shared.activateFileViewerSelecting([app.url])
@@ -202,7 +216,7 @@ final class LaunchpadController: NSObject, NSMenuDelegate {
                 self?.launch(app)
             },
             onDismiss: { [weak self] in
-                self?.dismiss()
+                self?.dismiss(reason: "escape")
             }
         )
     }
@@ -242,7 +256,7 @@ final class LaunchpadController: NSObject, NSMenuDelegate {
             return
         }
 
-        dismiss()
+        dismiss(reason: "launch")
 
         // 这里必须用异步版本：同步的 NSWorkspace.open 会一直阻塞到
         // LaunchServices 处理完（新装的 App 首次启动还要注册 + 查恶意软件，
@@ -400,7 +414,7 @@ final class LaunchpadController: NSObject, NSMenuDelegate {
         // The overlay sits at screen-saver level, so get it out of the way first.
         let wasVisible = panel?.isVisible == true
         if wasVisible {
-            dismiss()
+            dismiss(reason: "openPanel")
         }
 
         if openPanel.runModal() == .OK, let url = openPanel.url {
