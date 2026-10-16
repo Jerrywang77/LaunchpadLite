@@ -25,6 +25,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidBecomeActive(_ notification: Notification) {
         scheduleInitialPresentationIfNeeded()
+        controller?.reassertPanelIfNeeded()
     }
 
     func applicationShouldHandleReopen(

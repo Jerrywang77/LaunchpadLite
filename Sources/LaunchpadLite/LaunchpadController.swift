@@ -89,11 +89,49 @@ final class LaunchpadController: NSObject, NSMenuDelegate {
         panel.makeKey()
         NSApp.activate(ignoringOtherApps: true)
 
+        // 摆上去之后校验一次：少数情况下窗口被排到前面却没有真正显示，
+        // 这时再摆一次，避免出现「点了 Dock 图标像没反应」。
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
+            self?.assertPanelOnScreen(panel)
+        }
+
         let reduceMotion = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
         NSAnimationContext.runAnimationGroup { context in
             context.duration = reduceMotion ? 0 : 0.18
             panel.animator().alphaValue = 1
         }
+    }
+
+    /// 面板偶尔会被系统「摆上去但没有真正显示」——表现就是点 Dock 图标像没反应，
+    /// 之后切换窗口才冒出来。呈现后校验几次，没在屏幕上就再摆一次。
+    private func assertPanelOnScreen(_ panel: NSPanel, attempt: Int = 0) {
+        guard presentationLifecycle.isPresented, panel.isVisible else {
+            return
+        }
+        guard !panel.occlusionState.contains(.visible) else {
+            return
+        }
+        guard attempt < 3 else {
+            NSLog("Launchpad Lite: 面板呈现后仍未显示，已重试 %d 次", attempt)
+            return
+        }
+
+        NSLog("Launchpad Lite: 面板没有正常显示，第 %d 次重新显示", attempt + 1)
+        panel.alphaValue = 1
+        panel.orderFrontRegardless()
+        panel.makeKey()
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { [weak self] in
+            self?.assertPanelOnScreen(panel, attempt: attempt + 1)
+        }
+    }
+
+    /// App 激活状态变化时再校验一次：这是「面板摆上去了却没显示」的经典触发点。
+    func reassertPanelIfNeeded() {
+        guard let panel, presentationLifecycle.isPresented else {
+            return
+        }
+        assertPanelOnScreen(panel)
     }
 
     func dismiss() {
@@ -137,6 +175,8 @@ final class LaunchpadController: NSObject, NSMenuDelegate {
         panel.isReleasedWhenClosed = false
         panel.level = .screenSaver
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary]
+        // 面板的显示/隐藏完全由我们自己控制，不跟随 App 的激活状态。
+        panel.hidesOnDeactivate = false
         panel.contentView = NSHostingView(
             rootView: LaunchpadView(
                 viewModel: viewModel,
