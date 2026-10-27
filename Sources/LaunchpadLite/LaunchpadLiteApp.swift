@@ -20,11 +20,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let controller = LaunchpadController()
         self.controller = controller
         controller.start()
-        scheduleInitialPresentationIfNeeded()
     }
 
     func applicationDidBecomeActive(_ notification: Notification) {
-        scheduleInitialPresentationIfNeeded()
         controller?.reassertPanelIfNeeded()
     }
 
@@ -51,7 +49,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         guard !hasScheduledInitialPresentation else {
             return
         }
-        guard !launchedAtLogin || CommandLine.arguments.contains("--show-on-launch") else {
+        guard CommandLine.arguments.contains("--show-on-launch") else {
             return
         }
 

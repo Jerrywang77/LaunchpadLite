@@ -10,8 +10,13 @@ final class LaunchpadLiteTests: XCTestCase {
 
         XCTAssertEqual(laptop.columns, 8)
         XCTAssertEqual(laptop.rows, 4)
-        XCTAssertEqual(display.columns, 8)
-        XCTAssertEqual(display.rows, 6)
+        XCTAssertEqual(display.columns, 14)
+        XCTAssertEqual(display.rows, 8)
+
+        let builtIn = LaunchpadGridLayout.forScreen(size: CGSize(width: 1_512, height: 982))
+        let external = LaunchpadGridLayout.forScreen(size: CGSize(width: 2_048, height: 1_152))
+        XCTAssertEqual(builtIn.columns, 8)
+        XCTAssertGreaterThan(external.columns, builtIn.columns)
     }
 
     func testFilterMatchesAppNameOnly() {

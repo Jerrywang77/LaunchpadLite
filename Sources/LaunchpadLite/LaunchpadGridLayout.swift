@@ -19,8 +19,11 @@ struct LaunchpadGridLayout: Equatable {
         let usableWidth = max(720, size.width - horizontalPadding)
         let usableHeight = max(360, size.height - verticalPadding)
 
-        let columns = min(8, max(4, Int(usableWidth / columnStride)))
-        let rows = min(6, max(2, Int(usableHeight / rowStride)))
+        // Keep the familiar 8 columns on a built-in laptop display. Only a
+        // genuinely wider external display gets extra columns.
+        let columnLimit = size.width > 1_700 ? 14 : 8
+        let columns = min(columnLimit, max(4, Int(usableWidth / columnStride)))
+        let rows = min(8, max(2, Int(usableHeight / rowStride)))
 
         return LaunchpadGridLayout(columns: columns, rows: rows)
     }

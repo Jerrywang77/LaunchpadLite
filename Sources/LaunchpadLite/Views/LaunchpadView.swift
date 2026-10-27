@@ -28,7 +28,7 @@ struct LaunchpadView: View {
                 .padding(.top, 34)
 
                 content
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
 
                 PageIndicator(
                     pageCount: viewModel.pageCount,
@@ -102,7 +102,7 @@ struct LaunchpadView: View {
                 )
             }
         }
-        .frame(maxWidth: 1_360)
+        .frame(maxWidth: .infinity)
     }
 
     private func handleBackgroundTap() {
@@ -186,7 +186,7 @@ struct LaunchpadView: View {
             .frame(width: pageWidth * CGFloat(pageCount), alignment: .leading)
             .offset(x: -CGFloat(viewModel.page) * pageWidth)
         }
-        .frame(maxWidth: 1_360, maxHeight: .infinity, alignment: .top)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .clipped()
     }
 
@@ -214,6 +214,7 @@ struct LaunchpadView: View {
                 tile(for: app, pageIndex: pageIndex, metrics: metrics, rootOrigin: rootOrigin)
             }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .padding(.horizontal, LaunchpadTheme.gridHorizontalPadding)
         .coordinateSpace(name: Self.pageSpaceName(pageIndex))
         .overlay(alignment: .topLeading) {
